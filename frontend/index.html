@@ -3,168 +3,325 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF AI Assistant | Grounded Document Question Answering</title>
-    <meta name="description" content="Upload any PDF document to extract semantic insights, auto-generate topic-specific questions, and get strictly grounded answers with page references.">
-    <!-- Google Fonts -->
+    <title>QueryFolio — Intelligent Document RAG</title>
+    <meta name="description" content="QueryFolio: Intelligent Document RAG with real-time streaming, visual flowcharts, handwritten note OCR, and page citations.">
+    <!-- Google Fonts: DM Serif Display, Cormorant Garamond, Inter, JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Mermaid for Flowchart Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <!-- Marked & DOMPurify for Safe Markdown Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="app-header">
-            <div class="brand-container">
-                <div class="brand-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M16 13H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M16 17H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M10 9H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <div class="app-layout" id="appLayout">
+
+        <!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+        <aside class="app-sidebar" id="sidebar" aria-label="Document Management Sidebar">
+
+            <!-- Brand Header -->
+            <div class="brand-header">
+                <div class="brand-badge-wrap">
+                    <div class="brand-icon">
+                        <!-- Open Book Logo matching Burgundy reference -->
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 4.5C10.15 3.1 7.63 2.5 5 2.5 3.24 2.5 2 2.78 2 2.78V18.5s1.24-.28 3-.28c2.63 0 5.15.6 7 2 1.85-1.4 4.37-2 7-2 1.76 0 3 .28 3 .28V2.78s-1.24-.28-3-.28c-2.63 0-5.15.6-7 2zm0 2.22c1.7-1.12 3.88-1.72 6-1.72 1 0 1.79.1 2 .16v12.27c-.42-.08-1.14-.18-2-.18-2.37 0-4.73.66-6 1.84V6.72zM4 3.44c.21-.06 1-.16 2-.16 2.12 0 4.3.6 6 1.72v14.37c-1.27-1.18-3.63-1.84-6-1.84-.86 0-1.58.1-2 .18V3.44z"/>
+                        </svg>
+                    </div>
+                    <div class="brand-meta">
+                        <span class="brand-title">QueryFolio</span>
+                        <span class="brand-sub">Document Research RAG</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Primary Navigation: Chat Workspace (matching reference aesthetic) -->
+            <nav class="sidebar-nav">
+                <button class="nav-item active" id="navChat" type="button" aria-label="Chat Workspace">
+                    <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
-                </div>
-                <div>
-                    <h1 class="brand-title">PDF AI Assistant</h1>
-                    <p class="brand-subtitle">Ask questions & explore grounded insights from your document</p>
-                </div>
-            </div>
-            <div class="status-badge" id="appStatusBadge">
-                <span class="badge-dot"></span>
-                <span id="appStatusText">Ready for Upload</span>
-            </div>
-        </header>
+                    <span>Chat</span>
+                </button>
+            </nav>
 
-        <main class="app-main">
-            <!-- Upload Section -->
-            <section class="card upload-card" id="uploadSection">
-                <div class="section-header">
-                    <h2>Upload your PDF</h2>
-                    <p>Select or drag and drop a PDF file to analyze</p>
+            <!-- Active Document Info Card (Shown when document is uploaded) -->
+            <div class="sidebar-block doc-active-block hidden" id="docBlockSection">
+                <div class="section-title-row">
+                    <span class="section-title">Active Document</span>
                 </div>
-
-                <div class="drop-zone" id="dropZone">
-                    <input type="file" id="fileInput" accept=".pdf" class="file-input">
-                    <div class="drop-zone-content">
-                        <div class="upload-icon">
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M17 8L12 3L7 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M12 3V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <div class="active-doc-card" id="documentInfoCard">
+                    <div class="active-doc-left">
+                        <div class="pdf-icon-badge">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
                             </svg>
                         </div>
-                        <div class="upload-text-group">
-                            <span class="btn-browse" id="browseBtn">📄 Choose PDF File</span>
-                            <span class="drag-hint">or drag and drop file here</span>
+                        <div class="active-doc-text">
+                            <p class="active-doc-name" id="docName">document.pdf</p>
+                            <p class="active-doc-meta" id="docStats">— pages • — chunks</p>
                         </div>
-                        <p class="file-limit-hint">Maximum recommended file size: 50MB (.pdf only)</p>
                     </div>
+                    <button class="doc-swap-btn" id="changeFileBtn" type="button" title="Upload a different document" aria-label="Upload a different document">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                        </svg>
+                    </button>
                 </div>
+            </div>
 
-                <!-- Processing Progress Steps UI -->
-                <div class="processing-container hidden" id="processingContainer">
-                    <div class="processing-header">
-                        <div class="spinner-ring"></div>
-                        <span class="processing-title" id="processingCurrentStep">Processing document...</span>
-                    </div>
-
-                    <div class="progress-steps-list">
-                        <div class="step-item" id="step-upload">
-                            <span class="step-icon">1</span>
-                            <span class="step-label">Uploading PDF...</span>
-                        </div>
-                        <div class="step-item" id="step-extract">
-                            <span class="step-icon">2</span>
-                            <span class="step-label">Extracting text...</span>
-                        </div>
-                        <div class="step-item" id="step-chunk">
-                            <span class="step-icon">3</span>
-                            <span class="step-label">Creating chunks...</span>
-                        </div>
-                        <div class="step-item" id="step-embed">
-                            <span class="step-icon">4</span>
-                            <span class="step-label">Generating embeddings...</span>
-                        </div>
-                        <div class="step-item" id="step-index">
-                            <span class="step-icon">5</span>
-                            <span class="step-label">Building vector index...</span>
-                        </div>
-                        <div class="step-item" id="step-topics">
-                            <span class="step-icon">6</span>
-                            <span class="step-label">Finding important topics...</span>
-                        </div>
-                        <div class="step-item" id="step-questions">
-                            <span class="step-icon">7</span>
-                            <span class="step-label">Generating suggested questions...</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Active Document Info Card -->
-                <div class="document-info-card hidden" id="documentInfoCard">
-                    <div class="doc-file-meta">
-                        <div class="doc-badge-icon">📄</div>
-                        <div class="doc-details">
-                            <h3 class="doc-name" id="docName">document.pdf</h3>
-                            <span class="doc-stats" id="docStats">25 pages • 84 text chunks</span>
-                        </div>
-                    </div>
-                    <button class="btn-change-file" id="changeFileBtn">Upload New PDF</button>
-                </div>
-            </section>
-
-            <!-- Topic-Specific Suggested Questions Section -->
-            <section class="card questions-card hidden" id="questionsSection">
-                <div class="section-header">
-                    <h2>Important Questions</h2>
-                    <p>Click any question below to ask the AI assistant immediately</p>
+            <!-- Suggested Questions Section (Shown when document is uploaded) -->
+            <div class="sidebar-block questions-block hidden" id="questionsSection">
+                <div class="section-title-row">
+                    <span class="section-title">Suggested Inquiries</span>
                 </div>
                 <div class="questions-grid" id="questionsGrid">
-                    <!-- Dynamic Question Pills rendered by JS -->
+                    <!-- Dynamic question pills injected here -->
                 </div>
-            </section>
-
-            <!-- Chat Interface Section -->
-            <section class="card chat-card hidden" id="chat-section">
-                <div class="section-header chat-header">
-                    <h2>Chat with Document</h2>
-                    <span class="grounded-badge">🔒 Strictly Grounded Answers</span>
+                <div class="sidebar-guide-tip">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    <span>Click any question or ask for a flowchart</span>
                 </div>
+            </div>
 
-                <!-- Chat History Window -->
-                <div class="chat-history" id="chatHistory">
-                    <div class="welcome-chat-msg" id="chatWelcomeMsg">
-                        <p>💡 Ask any question about your document or select an <strong>Important Question</strong> above to start.</p>
+            <!-- Aesthetic Empty State Card when no document is active -->
+            <div class="sidebar-block empty-doc-block" id="sidebarEmptyState">
+                <div class="empty-doc-card">
+                    <div class="empty-doc-top">
+                        <div class="empty-doc-icon-badge">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                            </svg>
+                        </div>
+                        <h3 class="empty-doc-title">Knowledge Base</h3>
+                        <p class="empty-doc-text">Upload a PDF to explore grounded research and interactive diagrams.</p>
+                    </div>
+
+                    <div class="empty-doc-guide">
+                        <div class="guide-item">
+                            <div class="guide-item-left">
+                                <span class="guide-item-dot"></span>
+                                <span class="guide-item-title">Dual Hybrid RAG</span>
+                            </div>
+                            <span class="guide-item-tag">Dense + BM25</span>
+                        </div>
+                        <div class="guide-item">
+                            <div class="guide-item-left">
+                                <span class="guide-item-dot"></span>
+                                <span class="guide-item-title">Neural Reranking</span>
+                            </div>
+                            <span class="guide-item-tag">Cross-Encoder</span>
+                        </div>
+                        <div class="guide-item">
+                            <div class="guide-item-left">
+                                <span class="guide-item-dot"></span>
+                                <span class="guide-item-title">Visual Flowcharts</span>
+                            </div>
+                            <span class="guide-item-tag">Mermaid</span>
+                        </div>
+                        <div class="guide-item">
+                            <div class="guide-item-left">
+                                <span class="guide-item-dot"></span>
+                                <span class="guide-item-title">Vision OCR Engine</span>
+                            </div>
+                            <span class="guide-item-tag">Citations</span>
+                        </div>
+                    </div>
+
+                    <div class="empty-doc-tip">
+                        <svg class="tip-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <span>PDFs up to 50 MB supported</span>
                     </div>
                 </div>
+            </div>
 
-                <!-- Chat Input Controls -->
-                <form class="chat-input-form" id="chatForm">
-                    <div class="input-wrapper">
-                        <input type="text" id="chatInput" placeholder="Ask something about the PDF..." autocomplete="off" required>
-                        <button type="submit" class="btn-send" id="sendBtn" title="Send Question">
-                            <span>Send</span>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="22" y1="2" x2="11" y2="13"></line>
-                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </aside>
+
+        <!-- ═══════════════════════ MAIN CONTENT ═══════════════════════ -->
+        <main class="app-main" id="mainArea">
+
+            <!-- Welcome Screen (Minimal, Clean & Aesthetic) -->
+            <div class="welcome-canvas" id="welcomeScreen">
+                <div class="welcome-box">
+                    <div class="welcome-emblem">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 4.5C10.15 3.1 7.63 2.5 5 2.5 3.24 2.5 2 2.78 2 2.78V18.5s1.24-.28 3-.28c2.63 0 5.15.6 7 2 1.85-1.4 4.37-2 7-2 1.76 0 3 .28 3 .28V2.78s-1.24-.28-3-.28c-2.63 0-5.15.6-7 2zm0 2.22c1.7-1.12 3.88-1.72 6-1.72 1 0 1.79.1 2 .16v12.27c-.42-.08-1.14-.18-2-.18-2.37 0-4.73.66-6 1.84V6.72zM4 3.44c.21-.06 1-.16 2-.16 2.12 0 4.3.6 6 1.72v14.37c-1.27-1.18-3.63-1.84-6-1.84-.86 0-1.58.1-2 .18V3.44z"/>
+                        </svg>
+                    </div>
+                    <h1 class="welcome-heading">QueryFolio</h1>
+                    <p class="welcome-desc">A refined document intelligence workspace. Upload any PDF to read, explore, and synthesize grounded answers with interactive flowcharts.</p>
+                    
+                    <!-- Single Main Upload Button Target -->
+                    <div class="welcome-action-card" id="welcomeDropTarget">
+                        <input type="file" id="fileInput" accept=".pdf" class="file-input" style="display: none;" aria-label="Choose PDF document">
+                        <button type="button" class="welcome-upload-btn" id="welcomeUploadBtn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            <span>Upload PDF Document</span>
+                        </button>
+                        <p class="welcome-drag-hint">or drop your file anywhere to begin</p>
+                    </div>
+
+                    <!-- Processing Pipeline Checkpoints (Displays right here upon clicking Upload!) -->
+                    <div class="pipeline-card hidden" id="processingContainer" aria-live="polite">
+                        <div class="pipeline-header">
+                            <div class="neural-loader" aria-hidden="true">
+                                <div class="loader-paper-stack">
+                                    <div class="sheet sheet-1"></div>
+                                    <div class="sheet sheet-2"></div>
+                                    <div class="sheet sheet-3"></div>
+                                    <div class="laser-scanner"></div>
+                                </div>
+                                <div class="loader-data-stream">
+                                    <span class="stream-particle p1"></span>
+                                    <span class="stream-particle p2"></span>
+                                    <span class="stream-particle p3"></span>
+                                </div>
+                            </div>
+                            <div class="pipeline-header-text">
+                                <span class="pipeline-title">Document Ingestion Pipeline</span>
+                                <span class="pipeline-status" id="processingCurrentStep">Uploading…</span>
+                            </div>
+                        </div>
+                        <div class="pipeline-steps">
+                            <div class="pipe-step" id="step-upload">
+                                <span class="pipe-badge"><span class="pipe-dot"></span></span>
+                                <span class="pipe-name">Uploading PDF</span>
+                            </div>
+                            <div class="pipe-step" id="step-read">
+                                <span class="pipe-badge"><span class="pipe-dot"></span></span>
+                                <span class="pipe-name">Reading document</span>
+                            </div>
+                            <div class="pipe-step" id="step-ocr">
+                                <span class="pipe-badge"><span class="pipe-dot"></span></span>
+                                <span class="pipe-name">OCR &amp; vision scanning</span>
+                            </div>
+                            <div class="pipe-step" id="step-chunk">
+                                <span class="pipe-badge"><span class="pipe-dot"></span></span>
+                                <span class="pipe-name">Chunking contents</span>
+                            </div>
+                            <div class="pipe-step" id="step-embed">
+                                <span class="pipe-badge"><span class="pipe-dot"></span></span>
+                                <span class="pipe-name">Generating neural embeddings</span>
+                            </div>
+                            <div class="pipe-step" id="step-index">
+                                <span class="pipe-badge"><span class="pipe-dot"></span></span>
+                                <span class="pipe-name">Building vector index</span>
+                            </div>
+                            <div class="pipe-step" id="step-questions">
+                                <span class="pipe-badge"><span class="pipe-dot"></span></span>
+                                <span class="pipe-name">Synthesizing suggested inquiries</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="welcome-features-minimal">
+                        <span class="feature-tag">Streaming Synthesis</span>
+                        <span class="feature-dot">•</span>
+                        <span class="feature-tag">Visual Flowcharts</span>
+                        <span class="feature-dot">•</span>
+                        <span class="feature-tag">Verified Citations</span>
+                        <span class="feature-dot">•</span>
+                        <span class="feature-tag">Vision OCR</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Chat Interface -->
+            <div class="chat-workspace hidden" id="chat-section">
+
+                <!-- Chat Header Bar -->
+                <header class="chat-header">
+                    <div class="chat-header-left">
+                        <button class="mobile-menu-trigger" id="mobileSidebarToggle" aria-label="Toggle Document Panel">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
                             </svg>
                         </button>
+                        <div class="doc-title-group">
+                            <span class="doc-active-name" id="chatDocTitle">Document Session</span>
+                            <div class="grounding-pill">
+                                <span class="grounding-dot"></span>
+                                <span class="grounding-text">Document Grounded</span>
+                            </div>
+                        </div>
                     </div>
-                </form>
-            </section>
-        </main>
+                    <div class="chat-header-actions">
+                        <button type="button" class="action-btn" id="clearChatBtn" title="Clear Chat History" aria-label="Clear chat history">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            <span>Clear</span>
+                        </button>
+                    </div>
+                </header>
 
-        <!-- Footer -->
-        <footer class="app-footer">
-            <p>PDF RAG Assistant &bull; Powered by Hugging Face Sentence Transformers &amp; Google Gemini</p>
-        </footer>
+                <!-- Scrollable Messages Feed -->
+                <div class="chat-feed" id="chatHistory" role="log" aria-live="polite" aria-label="Conversation messages">
+                    <div class="feed-welcome-banner" id="chatWelcomeMsg">
+                        <div class="banner-icon">💡</div>
+                        <div class="banner-body">
+                            <p class="banner-title">Document indexed and ready</p>
+                            <p class="banner-sub">Ask questions below or select a suggested topic from the sidebar.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Floating Input Console -->
+                <div class="chat-console">
+                    <form class="console-form" id="chatForm" role="search" aria-label="Ask questions about document">
+                        <div class="console-input-bar" id="inputWrap">
+                            <button type="button" class="console-attach-btn" id="attachFileBtn" title="Attach or Upload PDF" aria-label="Upload PDF document">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                                </svg>
+                            </button>
+                            <input
+                                type="text"
+                                id="chatInput"
+                                class="console-input"
+                                placeholder="Type your question..."
+                                autocomplete="off"
+                                aria-label="Your question"
+                                maxlength="2000"
+                            >
+                            <button type="submit" class="console-send-btn" id="sendBtn" aria-label="Send query">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"/>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="console-disclaimer">Answers are strictly synthesized from retrieved document chunks</p>
+                    </form>
+                </div>
+
+            </div>
+        </main>
     </div>
 
-    <!-- Markdown Parser & HTML Sanitizer -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <!-- Application Script -->
     <script src="js/app.js"></script>
 </body>
 </html>
-

@@ -1,4 +1,4 @@
-from typing import Type, TypeVar, Optional, Any
+from typing import Type, TypeVar, Optional, Any, AsyncGenerator, Dict, Tuple
 from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from fastapi import HTTPException
@@ -13,20 +13,29 @@ class LLMFactoryService:
         self.api_key = GEMINI_API_KEY
         self.primary_model_name = PRIMARY_LLM_MODEL
         self.fallback_model_name = FALLBACK_LLM_MODEL
+        # Cache LLM instances by (model_name, temperature) to eliminate repeated client creation latency
+        self._llm_cache: Dict[Tuple[str, float], ChatGoogleGenerativeAI] = {}
 
     def _create_llm_instance(self, model_name: str, temperature: float = 0.1) -> ChatGoogleGenerativeAI:
-        """Helper to create a ChatGoogleGenerativeAI instance."""
+        """Helper to create or retrieve a cached ChatGoogleGenerativeAI instance."""
         if not self.api_key or self.api_key == "your_api_key_here":
             raise HTTPException(
                 status_code=400,
                 detail="GEMINI_API_KEY is not configured in backend/.env. Please configure your API key."
             )
-            
-        return ChatGoogleGenerativeAI(
+
+        cache_key = (model_name, round(temperature, 2))
+        if cache_key in self._llm_cache:
+            return self._llm_cache[cache_key]
+
+        instance = ChatGoogleGenerativeAI(
             model=model_name,
             google_api_key=self.api_key,
-            temperature=temperature
+            temperature=temperature,
+            max_retries=1
         )
+        self._llm_cache[cache_key] = instance
+        return instance
 
     def _extract_text_from_content(self, content: Any) -> str:
         """Safely extract plain text from string or structured content block lists (e.g. thinking tags)."""
@@ -54,7 +63,7 @@ class LLMFactoryService:
         and non-recoverable errors (invalid API key, auth failure, quota exhaustion).
         """
         err_msg = str(exc).lower()
-        
+
         # Non-recoverable Auth / Key errors
         if "api_key_invalid" in err_msg or "invalid api key" in err_msg or "unauthenticated" in err_msg:
             logger.error(f"Non-recoverable authentication error: {exc}")
@@ -100,6 +109,51 @@ class LLMFactoryService:
                 detail="The AI service is temporarily unavailable. Please try again."
             )
 
+    async def generate_text_stream(self, prompt: str, temperature: float = 0.1) -> AsyncGenerator[str, None]:
+        """
+        Streams text response token-by-token using PRIMARY_LLM_MODEL.
+        Falls back to FALLBACK_LLM_MODEL if the primary model initialization fails.
+        Uses ChatGoogleGenerativeAI.astream() for true LLM-level token streaming.
+        """
+        # Determine which model to use
+        model_name = self.primary_model_name
+        try:
+            llm = self._create_llm_instance(model_name, temperature=temperature)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Primary model instantiation failed for streaming: {e}")
+            if not self._is_recoverable_error(e):
+                raise HTTPException(status_code=400, detail="Invalid API key or authentication error.")
+            model_name = self.fallback_model_name
+            try:
+                llm = self._create_llm_instance(model_name, temperature=temperature)
+            except Exception as fallback_err:
+                logger.error(f"Fallback model instantiation failed: {fallback_err}")
+                raise HTTPException(status_code=500, detail="AI service temporarily unavailable.")
+
+        logger.info(f"Starting streaming generation with model: '{model_name}'")
+        try:
+            async for chunk in llm.astream(prompt):
+                content = self._extract_text_from_content(chunk.content)
+                if content:
+                    yield content
+        except Exception as e:
+            logger.error(f"Streaming failed mid-generation with model '{model_name}': {e}")
+            # Try fallback if primary failed mid-stream
+            if model_name == self.primary_model_name and self._is_recoverable_error(e):
+                logger.info(f"Attempting streaming fallback with '{self.fallback_model_name}'")
+                try:
+                    fallback_llm = self._create_llm_instance(self.fallback_model_name, temperature=temperature)
+                    async for chunk in fallback_llm.astream(prompt):
+                        content = self._extract_text_from_content(chunk.content)
+                        if content:
+                            yield content
+                    return
+                except Exception as fe:
+                    logger.error(f"Fallback streaming also failed: {fe}")
+            raise
+
     def generate_structured(self, prompt: str, schema_class: Type[T], temperature: float = 0.2) -> T:
         """
         Generates structured Pydantic output using PRIMARY_LLM_MODEL with automatic fallback to FALLBACK_LLM_MODEL.
@@ -133,7 +187,7 @@ class LLMFactoryService:
                 status_code=500,
                 detail="The AI service is temporarily unavailable. Please try again."
             )
-        
+
         raise HTTPException(
             status_code=500,
             detail="The AI service is temporarily unavailable. Please try again."

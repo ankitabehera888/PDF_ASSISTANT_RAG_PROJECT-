@@ -19,8 +19,8 @@ load_dotenv(dotenv_path=env_path)
 
 # AI & LLM Configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-PRIMARY_LLM_MODEL = os.getenv("PRIMARY_LLM_MODEL", "gemini-2.5-flash")
-FALLBACK_LLM_MODEL = os.getenv("FALLBACK_LLM_MODEL", "gemma-4-26b-a4b-it")
+PRIMARY_LLM_MODEL = os.getenv("PRIMARY_LLM_MODEL", "gemini-2.5-flash-lite")
+FALLBACK_LLM_MODEL = os.getenv("FALLBACK_LLM_MODEL", "gemini-flash-lite-latest")
 
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 EMBEDDING_DIMENSION = 384
@@ -42,7 +42,7 @@ DEFAULT_TOP_K = 5
 COLLECTION_NAME = "pdf_documents"
 
 # V2 High-Recall Retrieval & Reranker Settings
-RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", 10))
+RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", 14))
 RERANK_TOP_K = int(os.getenv("RERANK_TOP_K", 4))
 RERANKER_ENABLED = os.getenv("RERANKER_ENABLED", "true").lower() in ("true", "1", "yes")
 RERANKER_MODEL_NAME = os.getenv("RERANKER_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2")

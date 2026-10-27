@@ -27,15 +27,19 @@ class VectorService:
         if not chunks:
             return 0
         
-        logger.info(f"Adding {len(chunks)} section-aware chunks to ChromaDB collection '{COLLECTION_NAME}'...")
+        ocr_chunks = sum(1 for c in chunks if c.metadata.get("ocr_derived"))
+        logger.info(
+            f"[VECTOR INDEX TRACE] Adding {len(chunks)} vectors to ChromaDB collection '{COLLECTION_NAME}' "
+            f"(printed={len(chunks)-ocr_chunks}, ocr={ocr_chunks})..."
+        )
         self.vector_store.add_documents(chunks)
-        logger.info("Chunks successfully indexed into ChromaDB with section metadata.")
+        logger.info(f"[VECTOR INDEX TRACE] Successfully indexed {len(chunks)} vectors into ChromaDB.")
         return len(chunks)
 
     def similarity_search(self, query: str, document_id: str, top_k: int = RETRIEVAL_TOP_K) -> List[Document]:
         """
         Retrieves top_k high-recall candidate chunks from ChromaDB strictly filtered by document_id.
-        Default top_k is set to RETRIEVAL_TOP_K (10) for V2 high-recall candidate retrieval.
+        Default top_k is set to RETRIEVAL_TOP_K for high-recall candidate retrieval.
         """
         logger.info(f"High-recall search in ChromaDB for doc_id '{document_id}' | Query: '{query}' | (top_k={top_k})")
         filter_dict = {"document_id": document_id}
@@ -46,5 +50,9 @@ class VectorService:
             filter=filter_dict
         )
         
-        logger.info(f"Retrieved {len(results)} candidate chunks from ChromaDB for document_id={document_id}")
+        ocr_retrieved = sum(1 for d in results if d.metadata.get("ocr_derived"))
+        logger.info(
+            f"[VECTOR RETRIEVE TRACE] Retrieved {len(results)} candidate chunks from ChromaDB for doc_id={document_id} "
+            f"(printed={len(results)-ocr_retrieved}, ocr_chunks_retrieved={ocr_retrieved})"
+        )
         return results

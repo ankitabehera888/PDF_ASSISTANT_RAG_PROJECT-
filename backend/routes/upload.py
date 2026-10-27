@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pathlib import Path
 
@@ -20,7 +21,8 @@ question_service = QuestionService()
 async def upload_pdf(file: UploadFile = File(...)):
     """
     Endpoint for uploading a PDF document.
-    Pipeline: Validate -> Save -> Parse/Extract -> Chunk -> Embed & Store in ChromaDB -> Generate Suggested Questions.
+    Pipeline: Validate → Save → Parse/Extract (with OCR fallback for scanned pages)
+              → Chunk → Embed & Store in ChromaDB → Generate Suggested Questions.
     """
     validate_pdf_file(file)
     
@@ -39,18 +41,26 @@ async def upload_pdf(file: UploadFile = File(...)):
 
         logger.info(f"Saved uploaded PDF to {file_path}")
 
-        # Process PDF (extract pages & split into semantic chunks)
-        chunks, total_pages = pdf_service.load_and_process_pdf(
-            file_path=str(file_path),
-            document_id=document_id,
-            original_filename=file.filename
+        # Process PDF (extract pages & split into semantic chunks, with OCR for scanned pages)
+        chunks, total_pages = await asyncio.to_thread(
+            pdf_service.load_and_process_pdf,
+            str(file_path),
+            document_id,
+            file.filename
         )
 
-        # Store embeddings in ChromaDB
-        total_chunks = vector_service.add_documents(chunks)
+        # Count OCR-derived chunks (for display in UI)
+        ocr_pages = len({
+            chunk.metadata.get("page")
+            for chunk in chunks
+            if chunk.metadata.get("ocr_derived", False)
+        })
 
-        # Generate topic-specific suggested questions
-        suggested_questions = question_service.generate_suggested_questions(chunks)
+        # Store embeddings in ChromaDB (run in threadpool)
+        total_chunks = await asyncio.to_thread(vector_service.add_documents, chunks)
+
+        # Generate topic-specific suggested questions (run in threadpool)
+        suggested_questions = await asyncio.to_thread(question_service.generate_suggested_questions, chunks)
 
         return UploadResponse(
             success=True,
@@ -58,7 +68,8 @@ async def upload_pdf(file: UploadFile = File(...)):
             filename=file.filename,
             pages=total_pages,
             chunks=total_chunks,
-            suggested_questions=suggested_questions
+            suggested_questions=suggested_questions,
+            ocr_pages=ocr_pages,
         )
 
     except HTTPException:

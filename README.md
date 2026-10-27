@@ -1,88 +1,194 @@
-# PDF RAG Assistant with Topic-Specific Suggested Questions
+# QueryFolio — Advanced Document Research & Intelligence RAG
 
-A full-stack, local PDF Question-Answering application built with **FastAPI**, **ChromaDB**, **Hugging Face Sentence Transformers (`all-MiniLM-L6-v2`)**, **Google Gemini**, and a vanilla **HTML5/CSS3/JavaScript** frontend.
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Store-FF4F00)](https://www.trychroma.com/)
+[![Hugging Face](https://img.shields.io/badge/Hugging_Face-Sentence_Transformers-FFD21E?logo=huggingface&logoColor=black)](https://huggingface.co/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Mermaid.js](https://img.shields.io/badge/Mermaid.js-Interactive_Flowcharts-FF3670)](https://mermaid.js.org/)
 
-Upload any PDF document to automatically extract text, build a persistent vector index, generate **5–8 document-specific suggested questions**, and ask questions with strictly grounded answers and source page citations.
+**QueryFolio** is a full-stack, enterprise-grade Document Research and Intelligence platform. Built with **FastAPI**, **ChromaDB**, **BM25 Sparse Retrieval**, **Cross-Encoder Neural Reranking**, **Google Gemini / Multi-Provider LLMs**, and an aesthetic **Warm Beige & Burgundy Vanilla UI**, QueryFolio transforms static PDFs, scanned documents, and research papers into interactive, grounded knowledge with live token streaming and interactive architecture flowcharts.
 
 ---
 
 ## 🏗️ Architecture Pipeline
 
 ```text
-PDF Upload (.pdf)
-    ↓
-PyPDF Extraction (Page Metadata preserved)
-    ↓
-Recursive Character Text Chunking (size: 1000, overlap: 150)
-    ↓
-Hugging Face Sentence Transformer (all-MiniLM-L6-v2 → 384-dim vectors)
-    ↓
-ChromaDB Local Vector Database (Filtered by document_id)
-    ↓
-Representative Sampling & Gemini Topic Analysis
-    ↓
-5–8 Topic-Specific Suggested Questions (Structured JSON)
-    ↓
-User Query → Similarity Search → Grounded Gemini RAG → Answer + Source Pages
+                               ┌────────────────────────────────────────────────────────┐
+                               │                    PDF DOCUMENT                        │
+                               │        (Printed Text / Scanned / Handwritten)          │
+                               └──────────────────────────┬─────────────────────────────┘
+                                                          │
+                                         ┌────────────────┴────────────────┐
+                                         │                                 │
+                         [Standard Text Available]              [Scanned / Image Pages]
+                                         │                                 │
+                                         ▼                                 ▼
+                               ┌───────────────────┐             ┌───────────────────┐
+                               │  PyPDF Extractor  │             │  Vision OCR Engine│
+                               │  (Page Metadata)  │             │(PyMuPDF + Vision) │
+                               └─────────┬─────────┘             └─────────┬─────────┘
+                                         │                                 │
+                                         └────────────────┬────────────────┘
+                                                          ▼
+                                        ┌───────────────────────────────────┐
+                                        │  Recursive Character Text Chunking│
+                                        │  (Chunk: 1000, Overlap: 150)      │
+                                        └─────────────────┬─────────────────┘
+                                                          ▼
+                                ┌─────────────────────────┴─────────────────────────┐
+                                │                                                   │
+                                ▼                                                   ▼
+                     ┌─────────────────────┐                             ┌─────────────────────┐
+                     │ Dense Embeddings    │                             │ Sparse Indexing     │
+                     │ (all-MiniLM-L6-v2)  │                             │ (BM25 Tokenizer)    │
+                     └──────────┬──────────┘                             └──────────┬──────────┘
+                                │                                                   │
+                                ▼                                                   │
+                     ┌─────────────────────┐                                        │
+                     │ ChromaDB Collection │                                        │
+                     │ (Per-Doc Isolation) │                                        │
+                     └──────────┬──────────┘                                        │
+                                │                                                   │
+                                └─────────────────────────┬─────────────────────────┘
+                                                          ▼
+                                        ┌───────────────────────────────────┐
+                                        │    Representative Sampling        │
+                                        │  5–8 Topic-Specific Questions     │
+                                        └─────────────────┬─────────────────┘
+                                                          │
+   User Query ────────────────────────────────────────────┼─────────────────────────────────┐
+                                                          ▼                                 │
+                                        ┌───────────────────────────────────┐               │
+                                        │       Dual Hybrid Retrieval       │               │
+                                        │    Dense Vector + BM25 Search     │               │
+                                        └─────────────────┬─────────────────┘               │
+                                                          ▼                                 │
+                                        ┌───────────────────────────────────┐               │
+                                        │      Reciprocal Rank Fusion       │               │
+                                        │     & Candidate Deduplication     │               │
+                                        └─────────────────┬─────────────────┘               │
+                                                          ▼                                 │
+                                        ┌───────────────────────────────────┐               │
+                                        │   Cross-Encoder Neural Rerank     │               │
+                                        │  (ms-marco-MiniLM-L-6-v2)         │               │
+                                        └─────────────────┬─────────────────┘               │
+                                                          ▼                                 │
+                                        ┌───────────────────────────────────┐               │
+                                        │       Grounded RAG Prompt         │               │
+                                        │    (Strict Context & Refusal)     │               │
+                                        └─────────────────┬─────────────────┘               │
+                                                          ▼                                 │
+                                        ┌───────────────────────────────────┐               │
+                                        │    Multi-Provider LLM Factory     │               │
+                                        │ (Gemini 2.5 Flash / Gemma / etc.) │               │
+                                        └─────────────────┬─────────────────┘               │
+                                                          ▼                                 │
+                                        ┌───────────────────────────────────┐               │
+                                        │   Real-Time SSE Token Stream      │               │
+                                        │  + Verified Source Citations      │               │
+                                        │  + Interactive Mermaid Flowcharts │◄──────────────┘
+                                        └───────────────────────────────────┘
 ```
 
 ---
 
 ## 🚀 Key Features
 
-* **Hugging Face Local Embeddings**: Uses `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions) for both document chunks and user queries.
-* **ChromaDB Vector Storage**: Persistent local vector store (`data/chroma/`) with strict metadata filtering per `document_id` to prevent cross-document contamination.
-* **Automatic Topic-Specific Questions**: Samples representative content across the document to generate 5–8 non-generic, highly specific questions using Gemini structured output.
-* **Strictly Grounded RAG Answers**: Enforces refusal (`"I couldn't find the answer to that in the uploaded PDF."`) when questions are outside document scope.
-* **Source Citations**: Displays page numbers (1-indexed) and short excerpts for every answer.
-* **Modern Vanilla Frontend**: Sleek dark glassmorphism interface built with Vanilla HTML5, CSS3, and JavaScript (No React, Tailwind, or complex frameworks).
+### 1. 🔍 Dual Hybrid RAG (Dense Vector + BM25 Sparse Search)
+* **Dense Semantic Embeddings**: Utilizes `sentence-transformers/all-MiniLM-L6-v2` (384-dimensional vectors) to capture semantic context.
+* **Sparse BM25 Keyword Matching**: Integrates `rank-bm25` for exact phrase, technical acronym, and code snippet precision.
+* **Reciprocal Rank Fusion (RRF)**: Merges sparse and dense search rankings to surface the most relevant chunks.
+
+### 2. 🎯 Cross-Encoder Neural Reranking
+* Top candidates from hybrid retrieval are rescored using `cross-encoder/ms-marco-MiniLM-L-6-v2`.
+* Eliminates semantic false positives, ensuring that only the most contextually grounded chunks are passed into the LLM context window.
+
+### 3. ✍️ Vision OCR for Scanned & Mixed Documents
+* Integrated **Vision OCR Service** (`backend/services/ocr_service.py`) using **PyMuPDF (fitz)** paired with **Gemini 2.5 Vision** and **Tesseract OCR** fallback.
+* Transparently handles:
+  * Standard printed PDFs
+  * Scanned image-only PDFs
+  * Handwritten notes
+  * Mixed pages with diagrams, tables, and embedded illustrations
+* Preserves 1-indexed page metadata for all OCR-extracted text.
+
+### 4. ⚡ Real-Time SSE Token Streaming & Abort Control
+* Live token-by-token streaming via **Server-Sent Events** (`/api/chat/stream`).
+* Client-side `AbortController` support: users can immediately halt ongoing generation with the **Stop Generation** control.
+
+### 5. 📊 Interactive Mermaid Architecture Flowcharts
+* Generates interactive diagrams (flowcharts, mindmaps, sequence diagrams) on-demand or when explicitly requested (`"draw a flowchart"`).
+* Direct in-browser rendering via Mermaid.js matching the application's Warm Beige & Burgundy theme.
+* Interactive diagram toolbar: **Zoom In**, **Zoom Out**, **Reset View**, and **Copy Diagram Definition**.
+
+### 6. 📌 Strictly Grounded Answers & Page Citations
+* Enforces strict grounding prompts with zero hallucination. If a query cannot be answered from the document, the model returns a polite standard refusal.
+* Every answer includes verifiable page citations with collapsible excerpt drawers.
+
+### 7. 🎨 Refined, Minimal & Aesthetic UI
+* Crafted in vanilla **HTML5 / CSS3 / JavaScript** (zero bloated frameworks).
+* Curated **Warm Beige & Burgundy** color palette (`#FEF9F4`, `#F5E8E1`, `#8B1E3F`, `#3A1F1F`).
+* Responsive sidebar featuring dynamic Knowledge Base capability badges and suggested inquiries.
+* Right-anchored user message bubbles and left-anchored AI responses with markdown formatting and syntax-highlighted code blocks.
+
+### 8. 🛡️ Strict Document Isolation
+* ChromaDB vector collections isolate chunks with metadata filtering on `document_id`.
+* Switching documents or resetting sessions guarantees zero cross-document data leakage.
 
 ---
 
 ## 📦 Project Directory Structure
 
 ```text
-pdf-rag-assistant/
-│
+PDF_ASSISTANT_RAG_PROJECT/
 ├── backend/
-│   ├── main.py                   # FastAPI entrypoint, CORS & static mounting
-│   ├── config.py                 # App settings & environment variables
+│   ├── main.py                     # FastAPI application, CORS & static mounting
+│   ├── config.py                   # App settings & environment configurations
+│   ├── requirements.txt            # Python backend dependencies
+│   ├── tests_verify.py             # 13-scenario automated verification suite
 │   │
 │   ├── routes/
-│   │   ├── upload.py             # POST /api/upload endpoint
-│   │   ├── chat.py               # POST /api/chat endpoint
-│   │   └── questions.py          # POST /api/suggested-questions endpoint
+│   │   ├── upload.py               # POST /api/upload (pipeline & OCR extraction)
+│   │   ├── chat.py                 # POST /api/chat & GET /api/chat/stream (SSE)
+│   │   └── questions.py            # POST /api/suggested-questions
 │   │
 │   ├── services/
-│   │   ├── pdf_service.py        # PDF text loading & page-aware chunking
-│   │   ├── embedding_service.py  # Singleton Hugging Face embedding model
-│   │   ├── vector_service.py     # ChromaDB persistence & similarity search
-│   │   ├── question_service.py   # Representative chunk sampling & question generation
-│   │   └── rag_service.py        # Grounded RAG chain with page citations
+│   │   ├── pdf_service.py          # PDF text extraction & page-aware chunking
+│   │   ├── ocr_service.py          # Vision OCR for scanned pages & handwritten notes
+│   │   ├── embedding_service.py    # Singleton Hugging Face MiniLM embedding model
+│   │   ├── vector_service.py       # ChromaDB vector store & hybrid search
+│   │   ├── rag_service.py          # Hybrid RRF, Cross-Encoder rerank & RAG pipeline
+│   │   ├── question_service.py     # Representative sampling & question generation
+│   │   └── llm_factory.py          # Multi-provider LLM interface (Gemini, etc.)
 │   │
 │   ├── models/
-│   │   └── schemas.py            # Pydantic request/response schemas
+│   │   └── schemas.py              # Pydantic validation schemas
 │   │
-│   ├── utils/
-│   │   └── helpers.py            # Utility functions & logging
-│   │
-│   └── requirements.txt          # Python dependencies
+│   └── utils/
+│       └── helpers.py              # Structured logging & text utilities
 │
 ├── frontend/
-│   ├── index.html                # Modern glassmorphism web interface
+│   ├── index.html                  # Minimalist Warm Beige & Burgundy UI
 │   ├── css/
-│   │   └── style.css             # Vanilla CSS design system
+│   │   └── style.css               # Vanilla CSS design tokens & animations
 │   └── js/
-│       └── app.js                # UI state management & Fetch API integration
+│       └── app.js                  # Frontend controller, SSE streaming & Mermaid
+│
+├── evaluation/
+│   ├── README.md                   # Evaluation benchmark instructions
+│   ├── questions.json              # Curated ground-truth test questions
+│   └── run_evaluation.py           # Automated RAG metrics benchmark
 │
 ├── data/
-│   ├── uploads/                  # Local storage for uploaded PDF files
-│   └── chroma/                   # Local persistent ChromaDB vector store
+│   ├── uploads/                    # Local storage for uploaded PDF files
+│   └── chroma/                     # Local persistent ChromaDB vector store
 │
-├── .env                          # Local environment variables
-├── .env.example                  # Environment template
-├── .gitignore                    # Git ignore configuration
-└── README.md                     # Documentation
+├── Dockerfile                      # Production container definition
+├── .dockerignore                   # Docker build ignore rules
+├── .env.example                    # Template environment configuration
+├── .gitignore                      # Git ignore rules
+└── README.md                       # Documentation
 ```
 
 ---
@@ -90,66 +196,101 @@ pdf-rag-assistant/
 ## ⚙️ Installation & Setup
 
 ### 1. Prerequisites
-* Python 3.11+
+* **Python**: 3.11 or higher
+* **Google Gemini API Key**: [Get API key from Google AI Studio](https://aistudio.google.com/)
 
-### 2. Set Up Virtual Environment (Windows)
+### 2. Clone the Repository
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
+git clone https://github.com/ankitabehera888/PDF_ASSISTANT_RAG_PROJECT-.git
+cd PDF_ASSISTANT_RAG_PROJECT-
 ```
 
-### 3. Install Dependencies
+### 3. Set Up Virtual Environment
+
+**Windows (PowerShell):**
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+**Linux / macOS:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 4. Install Dependencies
 ```bash
 pip install -r backend/requirements.txt
 ```
 
-### 4. Configure Environment Variables
-Copy `.env.example` to `.env` and add your Google Gemini API Key:
+### 5. Configure Environment Variables
+Create a `.env` file in the project root:
 ```env
-GEMINI_API_KEY=your_actual_gemini_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+PRIMARY_LLM_MODEL=gemini-2.5-flash
+FALLBACK_LLM_MODEL=gemma-4-26b-a4b-it
 ```
 
 ---
 
 ## 🏃 Running the Application
 
-### Option A: Run Backend & Frontend via FastAPI (Recommended)
-FastAPI automatically serves the API at `/api/*` and mounts the static web frontend at `/`.
+### Option A: Local FastAPI Server (Recommended)
+FastAPI serves the REST/SSE API endpoints at `/api/*` and hosts the static frontend at `/`.
 
 ```bash
 uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
+Open your browser at: **`http://localhost:8000`**
 
-Open your browser at:
-`http://localhost:8000`
+### Option B: Docker Container
+Build and run with Docker:
 
-### Option B: Run API Server and Frontend Separately
-Start backend API:
 ```bash
-uvicorn backend.main:app --reload --port 8000
+docker build -t queryfolio-rag .
+docker run -p 8000:8000 --env-file .env queryfolio-rag
 ```
-Open `frontend/index.html` using Live Server or serve statically via Python:
-```bash
-python -m http.server 3000 --directory frontend
-```
-Navigate to `http://localhost:3000`.
 
 ---
 
-## 🧪 API Endpoints Summary
+## 🧪 API Endpoints Reference
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/health` | Service health status check |
-| `POST` | `/api/upload` | Upload PDF file, chunk, store vectors & generate suggested questions |
-| `POST` | `/api/chat` | Submit question for document RAG QA |
-| `POST` | `/api/suggested-questions` | Fetch / re-generate topic-specific questions for document ID |
+| `GET` | `/api/health` | Health check and system readiness probe |
+| `POST` | `/api/upload` | Upload PDF, run OCR if needed, generate hybrid indices and suggested inquiries |
+| `POST` | `/api/chat` | Non-streaming question-answering with citations and diagram generation |
+| `GET` | `/api/chat/stream` | **Server-Sent Events (SSE)** real-time streaming answer generation |
+| `POST` | `/api/suggested-questions` | Fetch / re-generate topic-specific inquiries for a document ID |
 
 ---
 
-## 🔮 Future Improvements
-* Multi-document similarity search & comparison mode.
-* Streaming response chunks via Server-Sent Events (SSE).
-* Hybrid keyword-semantic search (BM25 + Dense embeddings) and Cross-Encoder reranking.
-* Optical Character Recognition (OCR) support for scanned PDF documents.
-* User authentication and persistent chat conversation memory.
+## 📊 Verification & Evaluation
+
+### 1. Run the Comprehensive 13-Scenario Verification Suite
+QueryFolio includes an automated end-to-end verification script testing printed text, scanned pages, handwritten notes, streaming SSE, flowchart synthesis, refusal handling, and document isolation:
+
+```bash
+python backend/tests_verify.py
+```
+
+### 2. Run the RAG Evaluation Benchmark
+Evaluate retrieval precision, grounding recall, and response latency against curated test cases:
+
+```bash
+python evaluation/run_evaluation.py
+```
+
+---
+
+## 🔒 Security & Data Privacy
+
+* **Strict Metadata Filtering**: Chunks and vectors are scoped strictly by `document_id`. Queries from one document never retrieve context from another.
+* **Transient Session Control**: Clearing chat or swapping documents aborts active network streams and resets client-side context immediately.
+* **Local Embedding & Vector Storage**: Embeddings and ChromaDB indexes are computed and stored locally in `data/chroma/`.
+
+---
+
+## 📄 License
+This project is licensed under the MIT License.
